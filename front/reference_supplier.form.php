@@ -49,13 +49,13 @@ if (isset($_POST["add"])) {
    }
    Html::redirect($_SERVER['HTTP_REFERER']);
 
-} else if (isset($_POST["update"])) {
+} elseif (isset($_POST["update"])) {
    if (PluginOrderReference_Supplier::canCreate()) {
       $PluginOrderReference_Supplier->update($_POST);
    }
    Html::redirect($_SERVER['HTTP_REFERER']);
 
-} else if (isset($_POST["delete"])) {
+} elseif (isset($_POST["delete"])) {
    if (PluginOrderReference_Supplier::canCreate()) {
       foreach ($_POST["check"] as $ID => $value) {
          $PluginOrderReference_Supplier->delete(array("id"=>$ID));

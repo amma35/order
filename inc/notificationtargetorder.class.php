@@ -52,7 +52,7 @@ class PluginOrderNotificationTargetOrder extends NotificationTarget {
    }
 
    public function getDatasForTemplate($event,$options=array()) {
-      global $CFG_GLPI;
+      global $CFG_GLPI, $DB;
 
       $events = $this->getAllEvents();
       $this->datas['##order.action##'] = $events[$event];
@@ -107,6 +107,65 @@ class PluginOrderNotificationTargetOrder extends NotificationTarget {
          $comment = Toolbox::stripslashes_deep(str_replace(array('\r\n', '\n', '\r'), "<br/>", $options['comments']));
          $this->datas['##ordervalidation.comment##']        = nl2br($comment);
 
+         $order_item = new PluginOrderOrder_Item();
+         $result_ref = $order_item->queryDetail($this->obj->getField('id'));
+
+         $this->datas['##lang.item.quantity##']         = __("Quantity", "order");
+         $this->datas['##lang.item.id##']               = __('ID');
+         $this->datas['##lang.item.itemtype##']         = __("Equipment", "order");
+         $this->datas['##lang.item.manufacturers##']    = __("Manufacturer");
+         $this->datas['##lang.item.reference##']        = __("Reference");
+         $this->datas['##lang.item.type##']             = __("Type");
+         $this->datas['##lang.item.model##']            = __("Model");
+         $this->datas['##lang.item.price_taxfree##']    = __("Unit price tax free", "order");
+         $this->datas['##lang.item.ordertaxes##']       = __("VAT", "order");
+         $this->datas['##lang.item.discount##']         = __("Discount (%)", "order");
+         $this->datas['##lang.item.price_discounted##'] = __("Discounted price tax free", "order");
+         $this->datas['##lang.item.price_ati##']        = __("Price ATI", "order");
+
+         while ($data_ref = $DB->fetch_array($result_ref)) {
+            $tmp      = array();
+            $quantity = $order_item->getTotalQuantityByRefAndDiscount($this->obj->getField('id'), $data_ref["id"],
+                                                                $data_ref["price_taxfree"], $data_ref["discount"]);
+
+            $tmp['##item.quantity##'] = $quantity;
+            $item                          = new $data_ref["itemtype"]();
+            $tmp['##item.id##']       = $data_ref['IDD'];
+            /* type */
+            $tmp['##item.itemtype##'] = $item->getTypeName();
+            /* manufacturer */
+            $tmp['##item.manufacturers##'] = Dropdown::getDropdownName("glpi_manufacturers",
+                                                                       $data_ref["manufacturers_id"]);
+            /* reference */
+            $tmp['##item.reference##'] = $data_ref['name'];
+            /* type */
+            if (file_exists(GLPI_ROOT . "/inc/" . strtolower($data_ref["itemtype"]) . "type.class.php")) {
+               $tmp['##item.type##'] = Dropdown::getDropdownName(getTableForItemType($data_ref["itemtype"] . "Type"),
+                                                                 $data_ref["types_id"]);
+            } else if ($data_ref["itemtype"] == "PluginOrderOther") {
+               $tmp['##item.type##'] = $data_ref['othertypename'];
+            }
+
+            /* modele */
+            if (file_exists(GLPI_ROOT . "/inc/" . strtolower($data_ref["itemtype"]) . "model.class.php")) {
+               $tmp['##item.model##'] = Dropdown::getDropdownName(getTableForItemType($data_ref["itemtype"] . "Model"),
+                                                                  $data_ref["models_id"]);
+            }
+            /* tax free */
+            $tmp['##item.price_taxfree##'] = Html::formatNumber($data_ref["price_taxfree"]);
+            /* tva */
+            $tmp['##item.ordertaxes##'] = Dropdown::getDropdownName(getTableForItemType("PluginOrderOrderTax"),
+                                                                    $data_ref["plugin_order_ordertaxes_id"]);
+            /* reduction */
+            $tmp['##item.discount##'] = Html::formatNumber($data_ref["discount"]);
+            /* price with reduction */
+            $tmp['##item.price_discounted##'] = Html::formatNumber($data_ref["price_discounted"]);
+            /* price ati */
+            $tmp['##item.price_ati##'] = Html::formatNumber($data_ref["price_ati"]);
+
+            $this->datas['items'][] = $tmp;
+         }
+
          switch ($event) {
             case "ask" :
                $this->datas['##lang.ordervalidation.users##'] = __("Request order validation", "order")
@@ -143,24 +202,36 @@ class PluginOrderNotificationTargetOrder extends NotificationTarget {
 
    public function getTags() {
       $tags = array(
-         'ordervalidation.name'        => __("Name"),
-         'ordervalidation.numorder'    => __("Order number"),
-         'ordervalidation.orderdate'   => __("Date of order", "order"),
-         'ordervalidation.state'       => __("Status"),
-         'ordervalidation.comment'     => __("Comment of validation", "order"),
-         'ordervalidation.users'       => __("Editor of validation", "order"),
-         'order.entity'                => __("Delivery date"),
-         'order.item.name'             => __("Name"),
-         'order.item.state'            => __("Status"),
-         'order.item.numorder'         => __("Order number"),
-         'order.item.orderdate'        => __("Date of order", "order"),
-         'order.item.duedate'          => __("Estimated due date", "order"),
-         'order.item.deliverydate'     => __("Delivery date"),
-         'order.item.comment'          => __("Comments"),
-         'order.author.name'           => __("Author"),
-         'order.author.phone'          => __("Author") . ' - ' . __("Phone"),
-         'order.deliveryuser.name'     => __("Recipient"),
-         'order.deliveryuser.phone'    => __("Recipient") . ' - ' . __("Phone"),
+         'ordervalidation.name'      => __("Name"),
+         'ordervalidation.numorder'  => __("Order number"),
+         'ordervalidation.orderdate' => __("Date of order", "order"),
+         'ordervalidation.state'     => __("Status"),
+         'ordervalidation.comment'   => __("Comment of validation", "order"),
+         'ordervalidation.users'     => __("Editor of validation", "order"),
+         'order.entity'              => __("Delivery date"),
+         'order.item.name'           => __("Name"),
+         'order.item.state'          => __("Status"),
+         'order.item.numorder'       => __("Order number"),
+         'order.item.orderdate'      => __("Date of order", "order"),
+         'order.item.duedate'        => __("Estimated due date", "order"),
+         'order.item.deliverydate'   => __("Delivery date"),
+         'order.item.comment'        => __("Comments"),
+         'order.author.name'         => __("Author"),
+         'order.author.phone'        => __("Author") . ' - ' . __("Phone"),
+         'order.deliveryuser.name'   => __("Recipient"),
+         'order.deliveryuser.phone'  => __("Recipient") . ' - ' . __("Phone"),
+         'item.quantity'             => __("Quantity", "order"),
+         'item.id'                   => __('ID'),
+         'item.itemtype'             => __("Equipment", "order"),
+         'item.manufacturers'        => __("Manufacturer"),
+         'item.reference'            => __("Reference"),
+         'item.type'                 => __("Type"),
+         'item.model'                => __("Model"),
+         'item.price_taxfree'        => __("Unit price tax free", "order"),
+         'item.ordertaxes'           => __("VAT", "order"),
+         'item.discount'             => __("Discount (%)", "order"),
+         'item.price_discounted'     => __("Discounted price tax free", "order"),
+         'item.price_ati'            => __("Price ATI", "order"),
       );
 
       foreach ($tags as $tag => $label) {
@@ -180,6 +251,13 @@ class PluginOrderNotificationTargetOrder extends NotificationTarget {
       $this->addTagToList(array(
          'tag'     => 'orders',
          'label'   => __("Late orders", "order"),
+         'value'   => false,
+         'foreach' => true,
+      ));
+
+      $this->addTagToList(array(
+         'tag'     => 'items',
+         'label'   => __("Order item", "order"),
          'value'   => false,
          'foreach' => true,
       ));
