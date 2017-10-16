@@ -488,7 +488,7 @@ class PluginOrderOrder_Item extends CommonDBRelation {
       }
    }
 
-   public function queryDetail($ID, $tableRef) {
+   public function queryDetail($ID, $tableRef = 'glpi_plugin_order_references') {
       global $DB;
 
       $table = $this->getTable();

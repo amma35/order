@@ -166,6 +166,70 @@ class PluginOrderNotificationTargetOrder extends NotificationTarget {
             $this->datas['items'][] = $tmp;
          }
 
+         $result_ref = $order_item->queryDetail($this->obj->getField('id'), 'glpi_plugin_order_referencefrees');
+
+         while ($data_ref = $DB->fetch_array($result_ref)) {
+            $tmp      = array();
+            $quantity = $order_item->getTotalQuantityByRefAndDiscount($this->obj->getField('id'), $data_ref["id"],
+                                                                      $data_ref["price_taxfree"], $data_ref["discount"]);
+
+            $tmp['##item.quantity##'] = $quantity;
+            $item                          = new $data_ref["itemtype"]();
+            $tmp['##item.id##']       = $data_ref['IDD'];
+            /* type */
+            $tmp['##item.itemtype##'] = $item->getTypeName();
+            /* manufacturer */
+            $tmp['##item.manufacturers##'] = Dropdown::getDropdownName("glpi_manufacturers",
+                                                                       $data_ref["manufacturers_id"]);
+            /* reference */
+            $tmp['##item.reference##'] = $data_ref['name'];
+            /* type */
+            if (file_exists(GLPI_ROOT . "/inc/" . strtolower($data_ref["itemtype"]) . "type.class.php")) {
+               $tmp['##item.type##'] = Dropdown::getDropdownName(getTableForItemType($data_ref["itemtype"] . "Type"),
+                                                                 $data_ref["types_id"]);
+            } else if ($data_ref["itemtype"] == "PluginOrderOther") {
+               $tmp['##item.type##'] = $data_ref['othertypename'];
+            }
+
+            /* modele */
+            if (file_exists(GLPI_ROOT . "/inc/" . strtolower($data_ref["itemtype"]) . "model.class.php")) {
+               $tmp['##item.model##'] = Dropdown::getDropdownName(getTableForItemType($data_ref["itemtype"] . "Model"),
+                                                                  $data_ref["models_id"]);
+            }
+            /* tax free */
+            $tmp['##item.price_taxfree##'] = Html::formatNumber($data_ref["price_taxfree"]);
+            /* tva */
+            $tmp['##item.ordertaxes##'] = Dropdown::getDropdownName(getTableForItemType("PluginOrderOrderTax"),
+                                                                    $data_ref["plugin_order_ordertaxes_id"]);
+            /* reduction */
+            $tmp['##item.discount##'] = Html::formatNumber($data_ref["discount"]);
+            /* price with reduction */
+            $tmp['##item.price_discounted##'] = Html::formatNumber($data_ref["price_discounted"]);
+            /* price ati */
+            $tmp['##item.price_ati##'] = Html::formatNumber($data_ref["price_ati"]);
+
+            $this->datas['items'][] = $tmp;
+         }
+
+         $prices = $order_item->getAllPrices($this->obj->getField('id'));
+
+         $postagewithTVA = $order_item->getPricesATI($this->obj->getField(["port_price"]),
+                                                     Dropdown::getDropdownName("glpi_plugin_order_ordertaxes",
+                                                                               $this->obj->getField(["plugin_order_ordertaxes_id"])));
+
+         $total_HT  = $prices["priceHT"] + $this->fields["port_price"];
+         $total_TVA = $prices["priceTVA"] + $postagewithTVA - $this->fields["port_price"];
+         $total_TTC = $prices["priceTTC"] + $postagewithTVA;
+
+         $this->datas['##lang.order.totalht##']            = __("Price tax free", "order");
+         $this->datas['##order.totalht##']                 = Html::clean(Html::formatNumber($prices['priceHT']));
+         $this->datas['##lang.order.totalhtportprice##'] = __("Price tax free with postage", "order");
+         $this->datas['##order.totalhtportprice##']      = Html::clean(Html::formatNumber($total_HT));
+         $this->datas['##lang.order.totaltva##']           = __("VAT", "order");
+         $this->datas['##order.totaltva##']                = Html::clean(Html::formatNumber($total_TVA));
+         $this->datas['##lang.order.totalttc##']           = __("Price ATI", "order");
+         $this->datas['##order.totalttc##']                = Html::clean(Html::formatNumber($total_TTC));
+
          switch ($event) {
             case "ask" :
                $this->datas['##lang.ordervalidation.users##'] = __("Request order validation", "order")

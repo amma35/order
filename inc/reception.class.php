@@ -605,6 +605,7 @@ class PluginOrderReception extends CommonDBChild {
             }// $val == 1
 
          self::updateDelivryStatus($plugin_order_orders_id);
+      }
       } else {
          Session::addMessageAfterRedirect(__("No item selected", "order"), false, ERROR);
       }
