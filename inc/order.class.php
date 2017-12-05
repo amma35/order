@@ -448,6 +448,14 @@ class PluginOrderOrder extends CommonDBTM {
       $tab[27]['name']          = __("Recipient group", "order");
       $tab[27]['massiveaction'] = false;
 
+      $tab[28]['table']         = $this->getTable();
+      $tab[28]['field']         = 'id';
+      $tab[28]['number_items']     = true;
+      $tab[28]['datatype']      = 'specific';
+      $tab[28]['name']          = __("Delivered items", "order");
+      $tab[28]['massiveaction'] = false;
+      $tab[28]['nosearch']      = true;
+
       /* id */
       $tab[30]['table']         = $this->getTable();
       $tab[30]['field']         = 'id';
@@ -481,6 +489,33 @@ class PluginOrderOrder extends CommonDBTM {
       $tab[86]['massiveaction'] = false;
 
       return $tab;
+   }
+
+   /**
+    * @since version 0.84
+    *
+    * @param $field
+    * @param $values
+    * @param $options   array
+    * */
+   static function getSpecificValueToDisplay($field, $values, array $options = array()) {
+
+      if (!is_array($values)) {
+         $values = array($field => $values);
+      }
+      switch ($field) {
+         case 'id' :
+            if (isset($options['searchopt']['number_items']) && $options['searchopt']['number_items']) {
+               $orders_id = $values[$field];
+               $receptionne =  countElementsInTable(getTableForItemType('PluginOrderOrder_Item'),
+                                           "`plugin_order_orders_id` = '$orders_id'
+                                             AND `states_id` != '0' ");
+               $total = countElementsInTable(getTableForItemType('PluginOrderOrder_Item'),
+                                             "`plugin_order_orders_id` = '$orders_id'");
+               return "$receptionne / $total";
+            }
+      }
+      return parent::getSpecificValueToDisplay($field, $values, $options);
    }
 
    public function defineTabs($options=array()) {
